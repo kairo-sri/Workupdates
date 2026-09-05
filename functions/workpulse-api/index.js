@@ -17,23 +17,10 @@ app.use(cors({ origin: '*' }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// Patch Catalyst's req object — it lacks Node.js stream/EventEmitter methods
-app.use((req, res, next) => {
-  if (!req.listeners)        req.listeners        = () => []
-  if (!req.on)               req.on               = () => req
-  if (!req.once)             req.once             = () => req
-  if (!req.emit)             req.emit             = () => false
-  if (!req.removeListener)   req.removeListener   = () => req
-  if (!req.pipe)             req.pipe             = () => req
-  if (!req.unpipe)           req.unpipe           = () => req
-  if (!req.resume)           req.resume           = () => req
-  next()
-})
-
-// Attach Catalyst app to every request
+// Attach Catalyst app to every request (AdvancedIO — reads auth from req.headers)
 app.use((req, res, next) => {
   try {
-    req.catalyst = catalyst.initialize(req)
+    req.catalyst = catalyst.initialize(req, { type: 'advancedio' })
   } catch (e) {
     req.catalyst = null
   }
@@ -66,4 +53,39 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal server error' })
 })
 
-module.exports = app
+// Catalyst AdvancedIO wrapper — patches any missing stream/EventEmitter methods on the
+// Catalyst req object without replacing its prototype, then runs Express and returns a
+// Promise so Catalyst knows when the response is finished.
+const EventEmitter = require('events')
+
+module.exports = function catalystHandler (req, res) {
+  return new Promise((resolve, reject) => {
+    const em = new EventEmitter()
+
+    if (!req.listeners)          req.listeners          = em.listeners.bind(em)
+    if (!req.on)                 req.on                 = em.on.bind(em)
+    if (!req.once)               req.once               = em.once.bind(em)
+    if (!req.emit)               req.emit               = em.emit.bind(em)
+    if (!req.removeListener)     req.removeListener     = em.removeListener.bind(em)
+    if (!req.removeAllListeners) req.removeAllListeners = em.removeAllListeners.bind(em)
+    if (!req.resume)             req.resume             = function () { return this }
+    if (!req.pause)              req.pause              = function () { return this }
+    if (!req.pipe)               req.pipe               = function () { return this }
+    if (!req.unpipe)             req.unpipe             = function () { return this }
+    if (!req.destroy)            req.destroy            = function () { return this }
+    if (!req.headers)            req.headers            = {}
+
+    // Intercept res.end so we can resolve the Promise after the response is written
+    const _origEnd = res.end
+    res.end = function (...args) {
+      if (_origEnd) _origEnd.apply(this, args)
+      resolve()
+    }
+
+    try {
+      app(req, res)
+    } catch (err) {
+      reject(err)
+    }
+  })
+}
