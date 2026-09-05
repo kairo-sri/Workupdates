@@ -54,6 +54,19 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// Temporary: check what Catalyst env vars are available
+app.get('/api/debug-env', (req, res) => {
+  const keys = Object.keys(process.env).filter(k =>
+    k.includes('CATALYST') || k.includes('ZOHO') || k.includes('X_ZC')
+  )
+  const safe = {}
+  keys.forEach(k => {
+    const v = process.env[k] || ''
+    safe[k] = v.length > 40 ? v.slice(0, 20) + '…' : v
+  })
+  res.json({ catalystApp: !!_catalystApp, env: safe })
+})
+
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found', path: req.url })
 })
