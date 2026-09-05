@@ -40,7 +40,29 @@ app.use('/api/comments', commentRoutes)
 app.use('/api/hierarchy', hierarchyRoutes)
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  const fs = require('fs'), path = require('path')
+  const credPath = path.join(process.cwd(), 'catalyst/application_auth.json')
+  let credKeys = []
+  let credSample = {}
+  try {
+    const raw = JSON.parse(fs.readFileSync(credPath, 'utf8'))
+    credKeys = Object.keys(raw)
+    // Show short values, redact long ones
+    credKeys.forEach(k => {
+      const v = String(raw[k])
+      credSample[k] = v.length > 30 ? v.slice(0, 15) + '…' : v
+    })
+  } catch (e) {
+    credSample = { error: e.message }
+  }
+  res.json({
+    status: 'ok',
+    catalystInit: !!req.catalyst,
+    credPath,
+    credKeys,
+    credSample,
+    cwd: process.cwd()
+  })
 })
 
 app.use((req, res) => {
