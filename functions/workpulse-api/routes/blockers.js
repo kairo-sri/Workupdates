@@ -11,20 +11,20 @@ router.get('/', verifyToken, async (req, res) => {
 
     if (req.user.role === 'mentee') {
       sql = `SELECT * FROM Blockers WHERE mentee_id = '${req.user.id}'`
-      if (status) sql += ` AND status = '${status}'`
+      if (status) sql += ` AND blocker_status = '${status}'`
     } else if (req.user.role === 'mentor') {
       sql = `SELECT b.* FROM Blockers b INNER JOIN Hierarchy h ON b.mentee_id = h.mentee_id WHERE h.mentor_id = '${req.user.id}'`
       if (mentee_id) sql += ` AND b.mentee_id = '${mentee_id}'`
-      if (status) sql += ` AND b.status = '${status}'`
+      if (status) sql += ` AND b.blocker_status = '${status}'`
     } else if (req.user.role === 'manager') {
       sql = `SELECT b.* FROM Blockers b INNER JOIN Hierarchy h ON b.mentee_id = h.mentee_id WHERE h.manager_id = '${req.user.id}'`
       if (mentee_id) sql += ` AND b.mentee_id = '${mentee_id}'`
-      if (status) sql += ` AND b.status = '${status}'`
+      if (status) sql += ` AND b.blocker_status = '${status}'`
     } else {
       sql = 'SELECT * FROM Blockers'
       const filters = []
       if (mentee_id) filters.push(`mentee_id = '${mentee_id}'`)
-      if (status) filters.push(`status = '${status}'`)
+      if (status) filters.push(`blocker_status = '${status}'`)
       if (filters.length) sql += ' WHERE ' + filters.join(' AND ')
     }
 
@@ -47,9 +47,9 @@ router.post('/', verifyToken, async (req, res) => {
     const data = {
       feature_id,
       mentee_id: req.user.id,
-      description,
-      priority: priority || 'medium',
-      status: 'active',
+      blocker_description: description,
+      blocker_priority: priority || 'medium',
+      blocker_status: 'active',
       created_at: new Date().toISOString()
     }
 
@@ -76,7 +76,7 @@ router.patch('/:id/resolve', verifyToken, async (req, res) => {
 
     await updateRow(req.catalyst, 'Blockers', {
       ROWID: req.params.id,
-      status: 'resolved',
+      blocker_status: 'resolved',
       resolved_at: new Date().toISOString()
     })
 

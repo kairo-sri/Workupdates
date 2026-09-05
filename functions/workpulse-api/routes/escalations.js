@@ -56,7 +56,7 @@ router.post('/', verifyToken, async (req, res) => {
       escalated_to_role,
       escalated_to: escalatedToId,
       comment: comment || '',
-      status: 'active',
+      escalation_status: 'active',
       created_at: new Date().toISOString()
     }
 
@@ -101,7 +101,7 @@ router.patch('/:id/resolve', verifyToken, async (req, res) => {
 
     await updateRow(req.catalyst, 'Escalations', {
       ROWID: req.params.id,
-      status: 'resolved',
+      escalation_status: 'resolved',
       resolved_at: new Date().toISOString()
     })
     res.json({ message: 'Escalation resolved' })

@@ -28,7 +28,7 @@ router.post('/', verifyToken, async (req, res) => {
       author_id: req.user.id,
       author_name: req.user.name,
       author_role: req.user.role,
-      text,
+      comment_text: text,
       parent_id: parent_id || null,
       created_at: new Date().toISOString()
     }
