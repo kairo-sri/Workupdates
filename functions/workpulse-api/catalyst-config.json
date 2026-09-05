@@ -2,7 +2,7 @@
 	"deployment": {
 		"name": "workpulse-api",
 		"stack": "node18",
-		"type": "basicio",
+		"type": "advancedio",
 		"env_variables": {}
 	},
 	"execution": {

@@ -17,12 +17,24 @@ app.use(cors({ origin: '*' }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
+// Patch Catalyst's req object — it lacks Node.js stream/EventEmitter methods
+app.use((req, res, next) => {
+  if (!req.listeners)        req.listeners        = () => []
+  if (!req.on)               req.on               = () => req
+  if (!req.once)             req.once             = () => req
+  if (!req.emit)             req.emit             = () => false
+  if (!req.removeListener)   req.removeListener   = () => req
+  if (!req.pipe)             req.pipe             = () => req
+  if (!req.unpipe)           req.unpipe           = () => req
+  if (!req.resume)           req.resume           = () => req
+  next()
+})
+
 // Attach Catalyst app to every request
 app.use((req, res, next) => {
   try {
     req.catalyst = catalyst.initialize(req)
   } catch (e) {
-    // Allow requests outside Catalyst (local dev)
     req.catalyst = null
   }
   next()
@@ -43,18 +55,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// Catch-all 404 — prevents Express finalhandler from running
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found', path: req.url })
+})
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error(err.stack)
   res.status(500).json({ error: err.message || 'Internal server error' })
 })
 
-// Catalyst BasicIO handler
-module.exports = (context, basicIO) => {
-  basicIO.setReadType(catalyst.BasicIO.read_type.json)
-
-  const req = basicIO.getRequest()
-  const res = basicIO.getResponse()
-
-  app(req, res)
-}
+module.exports = app
