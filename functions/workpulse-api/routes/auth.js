@@ -30,7 +30,7 @@ router.post('/login', async (req, res) => {
     })
   } catch (err) {
     console.error('Login error:', err)
-    res.status(500).json({ error: 'Login failed', detail: err.message, catalyst: !!req.catalyst })
+    res.status(500).json({ error: 'Login failed' })
   }
 })
 

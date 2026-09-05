@@ -18,26 +18,15 @@ app.use(cors({ origin: '*' }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// Initialize Catalyst once using runtime admin credentials (CATALYST_CONFIG env var).
-// Browser requests don't carry Catalyst auth headers, so we can't use
-// catalyst.initialize(req) — we need the server-side admin app instead.
-let _catalystApp = null
-function getCatalystApp() {
-  if (_catalystApp) return _catalystApp
-  try {
-    _catalystApp = catalyst.initializeApp()
-  } catch (e) {
-    if (!e.message || !e.message.includes('duplicate')) {
-      console.error('Catalyst initializeApp error:', e.message)
-    }
-    // Already initialized — grab the default app from the collection
-    _catalystApp = catalyst.appCollection?.['[DEFAULT]'] || null
-  }
-  return _catalystApp
-}
-
+// Catalyst is initialized from the incoming request headers.
+// Requests proxied through Catalyst Slate automatically carry auth headers
+// so catalyst.initialize(req) can authenticate to Data Store and other services.
 app.use((req, res, next) => {
-  req.catalyst = getCatalystApp()
+  try {
+    req.catalyst = catalyst.initialize(req, { type: 'advancedio' })
+  } catch (e) {
+    req.catalyst = null
+  }
   next()
 })
 
@@ -54,19 +43,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Temporary: check what Catalyst env vars are available
-app.get('/api/debug-env', (req, res) => {
-  const keys = Object.keys(process.env).filter(k =>
-    k.includes('CATALYST') || k.includes('ZOHO') || k.includes('X_ZC')
-  )
-  const safe = {}
-  keys.forEach(k => {
-    const v = process.env[k] || ''
-    safe[k] = v.length > 40 ? v.slice(0, 20) + '…' : v
-  })
-  res.json({ catalystApp: !!_catalystApp, env: safe })
-})
-
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found', path: req.url })
 })
@@ -76,8 +52,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal server error' })
 })
 
-// AdvancedIO handler — patches missing stream methods on Catalyst's req,
-// wraps res.end so the returned Promise resolves when the response is sent.
+// AdvancedIO handler
 module.exports = function catalystHandler(req, res) {
   return new Promise((resolve, reject) => {
     const em = new EventEmitter()
