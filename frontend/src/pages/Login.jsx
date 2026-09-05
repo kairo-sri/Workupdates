@@ -1,18 +1,28 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { LOGIN_OPTIONS } from '../mock/users'
 
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [selected, setSelected] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = () => {
-    const option = LOGIN_OPTIONS.find(o => o.label === selected)
-    if (!option) return
-    login(option.user)
-    navigate('/')
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!email || !password) return
+    setError('')
+    setLoading(true)
+    try {
+      const user = await login(email, password)
+      navigate('/')
+    } catch (err) {
+      setError(err.data?.error || 'Invalid email or password')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -23,33 +33,42 @@ export default function Login() {
           <p className="text-sm text-gray-500">Team progress tracking</p>
         </div>
 
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Login as
-            </label>
-            <select
-              value={selected}
-              onChange={e => setSelected(e.target.value)}
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            >
-              <option value="">Select a user...</option>
-              {LOGIN_OPTIONS.map(o => (
-                <option key={o.label} value={o.label}>{o.label}</option>
-              ))}
-            </select>
+              placeholder="you@zoho.com"
+              autoFocus
+            />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              placeholder="••••••••"
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+          )}
+
           <button
-            onClick={handleLogin}
-            disabled={!selected}
+            type="submit"
+            disabled={!email || !password || loading}
             className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed py-2.5"
           >
-            Sign In
+            {loading ? 'Signing in…' : 'Sign In'}
           </button>
-        </div>
-
-        <p className="text-xs text-gray-400 text-center mt-4">Mock login — no password required in dev mode</p>
+        </form>
       </div>
     </div>
   )

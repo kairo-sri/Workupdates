@@ -33,14 +33,16 @@ import AdminFeatures from '../pages/superadmin/Features'
 import SystemSettings from '../pages/superadmin/SystemSettings'
 
 function ProtectedRoute({ children, allowedRoles }) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+  if (loading) return null
   if (!user) return <Navigate to="/login" replace />
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />
   return children
 }
 
 function RoleHome() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+  if (loading) return null
   if (!user) return <Navigate to="/login" replace />
   const homes = {
     mentee: '/mentee/dashboard',

@@ -1,8 +1,6 @@
-import { useState } from 'react'
-import { useAuth } from '../../context/AuthContext'
-import { MOCK_BLOCKERS } from '../../mock/blockers'
-import { MOCK_FEATURES } from '../../mock/features'
-import { CheckCircle2, AlertTriangle, MessageSquare, Plus } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { api } from '../../services/api'
+import { CheckCircle2, Plus } from 'lucide-react'
 
 const PRIORITY_STYLE = {
   low: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -11,35 +9,57 @@ const PRIORITY_STYLE = {
 }
 
 export default function MyBlockers() {
-  const { user } = useAuth()
-  const [blockers, setBlockers] = useState(MOCK_BLOCKERS.filter(b => b.menteeId === user?.id))
+  const [blockers, setBlockers] = useState([])
+  const [features, setFeatures] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ featureId: '', description: '', priority: 'medium' })
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const features = MOCK_FEATURES.filter(f => f.menteeId === user?.id)
+  useEffect(() => {
+    Promise.all([api.getBlockers(), api.getFeatures()])
+      .then(([bd, fd]) => {
+        setBlockers(bd.blockers || [])
+        setFeatures(fd.features || [])
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
 
-  const active = blockers.filter(b => b.status === 'active')
-  const resolved = blockers.filter(b => b.status === 'resolved')
+  const active = blockers.filter(b => b.blocker_status === 'active')
+  const resolved = blockers.filter(b => b.blocker_status === 'resolved')
 
-  const markResolved = (id) => {
-    setBlockers(prev => prev.map(b => b.id === id ? { ...b, status: 'resolved' } : b))
-  }
-
-  const handleAdd = () => {
-    if (!form.featureId || !form.description.trim()) return
-    const feature = features.find(f => f.id === form.featureId)
-    const newBlocker = {
-      id: `b${Date.now()}`, featureId: form.featureId, menteeId: user.id,
-      description: form.description, priority: form.priority,
-      status: 'active', daysBlocked: 0, createdAt: new Date().toISOString().split('T')[0],
-      featureName: feature?.name
+  const markResolved = async (id) => {
+    try {
+      await api.resolveBlocker(id)
+      setBlockers(prev => prev.map(b => b.ROWID === id ? { ...b, blocker_status: 'resolved' } : b))
+    } catch (err) {
+      alert(err.message)
     }
-    setBlockers(prev => [...prev, newBlocker])
-    setForm({ featureId: '', description: '', priority: 'medium' })
-    setShowModal(false)
   }
 
-  const getFeatureName = (id) => features.find(f => f.id === id)?.name || 'Unknown Feature'
+  const handleAdd = async () => {
+    if (!form.featureId || !form.description.trim()) return
+    setSaving(true)
+    try {
+      const data = await api.createBlocker({
+        feature_id: form.featureId,
+        description: form.description,
+        priority: form.priority,
+      })
+      setBlockers(prev => [...prev, data.blocker])
+      setForm({ featureId: '', description: '', priority: 'medium' })
+      setShowModal(false)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const getFeatureName = (id) => features.find(f => String(f.ROWID) === String(id))?.name || 'Unknown Feature'
+
+  if (loading) return <div className="text-center py-16 text-gray-400 text-sm">Loading blockers…</div>
 
   return (
     <div>
@@ -53,69 +73,31 @@ export default function MyBlockers() {
         </button>
       </div>
 
-      {/* Active blockers */}
       {active.length > 0 && (
         <div className="mb-6">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Active ({active.length})</h2>
           <div className="space-y-3">
             {active.map(blocker => (
-              <div key={blocker.id} className="card border-red-200 p-4">
+              <div key={blocker.ROWID} className="card border-red-200 p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm">📦 {getFeatureName(blocker.featureId)}</p>
+                    <p className="font-semibold text-gray-900 text-sm">📦 {getFeatureName(blocker.feature_id)}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-xs font-semibold border rounded px-2 py-0.5 uppercase ${PRIORITY_STYLE[blocker.priority]}`}>
-                        {blocker.priority}
+                      <span className={`text-xs font-semibold border rounded px-2 py-0.5 uppercase ${PRIORITY_STYLE[blocker.blocker_priority] || PRIORITY_STYLE.medium}`}>
+                        {blocker.blocker_priority}
                       </span>
-                      <span className="text-xs text-gray-500">{blocker.daysBlocked} days blocked</span>
                     </div>
                   </div>
                 </div>
-
                 <div className="bg-gray-50 rounded-lg p-3 mb-3">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Blocker</p>
-                  <p className="text-sm text-gray-700">{blocker.description}</p>
+                  <p className="text-sm text-gray-700">{blocker.blocker_description}</p>
                 </div>
-
-                {/* Timeline dots */}
-                <div className="mb-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Timeline</p>
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: 7 }, (_, i) => (
-                      <div
-                        key={i}
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
-                          i < blocker.daysBlocked ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'
-                        }`}
-                      >
-                        {i + 1}
-                      </div>
-                    ))}
-                    <span className="ml-2 text-xs text-red-500 font-semibold">{blocker.daysBlocked}d</span>
-                  </div>
-                  <div className="flex gap-1 mt-1 pl-0.5">
-                    {Array.from({ length: 7 }, (_, i) => (
-                      <span key={i} className="text-[9px] text-gray-400 w-7 text-center">D{i + 1}</span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Actions */}
                 <div className="flex gap-2 flex-wrap">
-                  <button className="btn-danger text-xs flex items-center gap-1.5 py-1.5">
-                    🚨 Escalate to Mentor
-                  </button>
-                  <button className="btn-danger text-xs flex items-center gap-1.5 py-1.5">
-                    🚨 Escalate to Manager
-                  </button>
                   <button
-                    onClick={() => markResolved(blocker.id)}
-                    className="flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-100 transition-colors"
-                  >
+                    onClick={() => markResolved(blocker.ROWID)}
+                    className="flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-100 transition-colors">
                     <CheckCircle2 size={13} /> Mark as Resolved
-                  </button>
-                  <button className="flex items-center gap-1.5 bg-gray-50 text-gray-600 border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-100 transition-colors">
-                    <MessageSquare size={13} /> Add Update
                   </button>
                 </div>
               </div>
@@ -124,16 +106,15 @@ export default function MyBlockers() {
         </div>
       )}
 
-      {/* Resolved */}
       {resolved.length > 0 && (
         <div>
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Resolved ({resolved.length})</h2>
           <div className="space-y-2">
             {resolved.map(blocker => (
-              <div key={blocker.id} className="card p-4 flex items-center justify-between">
+              <div key={blocker.ROWID} className="card p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-gray-700">{getFeatureName(blocker.featureId)}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{blocker.description}</p>
+                  <p className="text-sm font-semibold text-gray-700">{getFeatureName(blocker.feature_id)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{blocker.blocker_description}</p>
                 </div>
                 <span className="flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
                   <CheckCircle2 size={12} /> Resolved
@@ -144,7 +125,10 @@ export default function MyBlockers() {
         </div>
       )}
 
-      {/* Report Blocker Modal */}
+      {active.length === 0 && resolved.length === 0 && (
+        <div className="text-center py-16 text-gray-400 text-sm">No blockers reported yet.</div>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
@@ -152,22 +136,18 @@ export default function MyBlockers() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Feature *</label>
-                <select
-                  value={form.featureId}
+                <select value={form.featureId}
                   onChange={e => setForm(p => ({ ...p, featureId: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                >
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                   <option value="">Select feature...</option>
-                  {features.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  {features.map(f => <option key={f.ROWID} value={f.ROWID}>{f.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Priority</label>
-                <select
-                  value={form.priority}
+                <select value={form.priority}
                   onChange={e => setForm(p => ({ ...p, priority: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                >
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
@@ -175,18 +155,18 @@ export default function MyBlockers() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Describe the blocker *</label>
-                <textarea
-                  value={form.description}
+                <textarea value={form.description}
                   onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                   rows={3}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
-                  placeholder="What is blocking you?"
-                />
+                  placeholder="What is blocking you?" />
               </div>
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={handleAdd} className="btn-primary flex-1">Report</button>
+              <button onClick={handleAdd} disabled={saving} className="btn-primary flex-1 disabled:opacity-50">
+                {saving ? 'Reporting…' : 'Report'}
+              </button>
             </div>
           </div>
         </div>

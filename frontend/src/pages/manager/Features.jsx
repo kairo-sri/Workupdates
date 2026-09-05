@@ -1,8 +1,6 @@
-import { useState } from 'react'
-import { MOCK_FEATURES } from '../../mock/features'
-import { MOCK_USERS } from '../../mock/users'
-import { Plus, AlertCircle, Circle, CheckCircle2 } from 'lucide-react'
-import { CATEGORIES } from '../../mock/features'
+import { useState, useEffect } from 'react'
+import { api } from '../../services/api'
+import { AlertCircle, Circle, CheckCircle2 } from 'lucide-react'
 
 const STATUS_ICON = {
   active: <Circle size={13} className="text-blue-500" />,
@@ -12,125 +10,79 @@ const STATUS_ICON = {
 const PROGRESS_COLOR = { active: 'bg-blue-500', blocked: 'bg-red-500', completed: 'bg-green-500' }
 
 export default function ManagerFeatures() {
-  const mentees = MOCK_USERS.filter(u => u.role === 'mentee')
-  const [features, setFeatures] = useState(MOCK_FEATURES)
+  const [features, setFeatures] = useState([])
+  const [users, setUsers] = useState([])
   const [filterMentee, setFilterMentee] = useState('all')
   const [filterStatus, setFilterStatus] = useState('All')
-  const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ name: '', description: '', category: 'Feature', menteeId: '' })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([api.getFeatures(), api.getUsers()])
+      .then(([fd, ud]) => {
+        setFeatures(fd.features || [])
+        setUsers((ud.users || []).filter(u => u.role === 'mentee'))
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
 
   const filtered = features.filter(f => {
-    const menteeMatch = filterMentee === 'all' || f.menteeId === filterMentee
-    const statusMatch = filterStatus === 'All' || f.status === filterStatus.toLowerCase()
+    const menteeMatch = filterMentee === 'all' || String(f.mentee_id) === String(filterMentee)
+    const statusMatch = filterStatus === 'All' || f.feature_status === filterStatus.toLowerCase()
     return menteeMatch && statusMatch
   })
 
-  const getMenteeName = id => MOCK_USERS.find(u => u.id === id)?.name || 'Unknown'
-
-  const handleAdd = () => {
-    if (!form.name.trim() || !form.menteeId) return
-    const newFeature = {
-      id: `f${Date.now()}`, name: form.name, description: form.description,
-      category: form.category, status: 'active', progress: 0,
-      menteeId: form.menteeId, createdBy: 'u4',
-    }
-    setFeatures(prev => [...prev, newFeature])
-    setForm({ name: '', description: '', category: 'Feature', menteeId: '' })
-    setShowModal(false)
-  }
+  if (loading) return <div className="text-center py-16 text-gray-400 text-sm">Loading features…</div>
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Features</h1>
-          <p className="text-sm text-gray-500">{filtered.length} features across your branch</p>
-        </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> New Feature
-        </button>
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-gray-900">All Features</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{features.length} features total</p>
       </div>
 
-      {/* Filters */}
       <div className="flex gap-3 mb-5 flex-wrap">
         <select value={filterMentee} onChange={e => setFilterMentee(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-300">
           <option value="all">All Mentees</option>
-          {mentees.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          {users.map(u => <option key={u.ROWID} value={u.ROWID}>{u.name}</option>)}
         </select>
-        <div className="flex gap-1.5">
-          {['All', 'Active', 'Blocked', 'Completed'].map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filterStatus === s ? 'bg-indigo-100 text-indigo-700' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-            >{s}</button>
-          ))}
-        </div>
+        {['All', 'Active', 'Blocked', 'Completed'].map(s => (
+          <button key={s} onClick={() => setFilterStatus(s)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              filterStatus === s ? 'bg-indigo-100 text-indigo-700' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}>{s}</button>
+        ))}
       </div>
 
       <div className="space-y-3">
-        {filtered.map(f => (
-          <div key={f.id} className={`card p-4 ${f.status === 'blocked' ? 'border-red-200 bg-red-50/20' : ''}`}>
+        {filtered.map(feature => (
+          <div key={feature.ROWID} className={`card p-4 ${feature.feature_status === 'blocked' ? 'border-red-200 bg-red-50/30' : ''}`}>
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-0.5">
-                  {STATUS_ICON[f.status]}
-                  <span className="font-semibold text-gray-900 text-sm">{f.name}</span>
-                  {f.status === 'blocked' && <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded">BLOCKED</span>}
+                <div className="flex items-center gap-2 mb-1">
+                  {STATUS_ICON[feature.feature_status] || STATUS_ICON.active}
+                  <span className="font-semibold text-gray-900 text-sm">{feature.name}</span>
+                  {feature.feature_status === 'blocked' && (
+                    <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded">BLOCKED</span>
+                  )}
                 </div>
-                <p className="text-xs text-gray-500 mb-2">{f.description}</p>
-                {f.blockerReason && <p className="text-xs text-amber-700 mb-2">⚠️ {f.blockerReason}</p>}
+                <p className="text-xs text-gray-500 mb-2">{feature.feature_description}</p>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-                    <div className={`h-1.5 rounded-full ${PROGRESS_COLOR[f.status]}`} style={{ width: `${f.progress}%` }} />
+                    <div className={`h-1.5 rounded-full ${PROGRESS_COLOR[feature.feature_status] || 'bg-blue-500'}`}
+                      style={{ width: `${feature.progress || 0}%` }} />
                   </div>
-                  <span className="text-xs text-gray-500">{f.progress}%</span>
+                  <span className="text-xs text-gray-500 w-8 text-right">{feature.progress || 0}%</span>
                 </div>
               </div>
-              <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded-lg shrink-0">{getMenteeName(f.menteeId)}</span>
             </div>
           </div>
         ))}
-        {filtered.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No features found.</div>}
+        {filtered.length === 0 && (
+          <div className="text-center py-12 text-gray-400 text-sm">No features found.</div>
+        )}
       </div>
-
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-base font-bold text-gray-900 mb-4">New Feature</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Assign to Mentee *</label>
-                <select value={form.menteeId} onChange={e => setForm(p => ({ ...p, menteeId: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                  <option value="">Select mentee...</option>
-                  {mentees.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Feature Name *</label>
-                <input type="text" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Feature name" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
-                <input type="text" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Short description" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
-                <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                  {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={handleAdd} className="btn-primary flex-1">Add Feature</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
