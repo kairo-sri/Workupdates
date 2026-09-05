@@ -1,0 +1,26 @@
+export const MOCK_ESCALATIONS = [
+  {
+    id: 'e1', blockerId: 'b1', menteeId: 'u1', menteeName: 'Ravi Menon', menteeAvatar: 'RM', menteeEmail: 'ravi@zoho.com',
+    featureName: 'Custom Modules API',
+    description: 'Waiting for API design approval from lead architect — ticket raised but no response.',
+    priority: 'medium',
+    status: 'active',
+    daysBlocked: 3,
+    escalatedBy: 'u1',
+    escalatedTo: 'u3',
+    level: 'mentor',
+    mentorComment: '',
+  },
+  {
+    id: 'e2', blockerId: 'b2', menteeId: 'u5', menteeName: 'Arjun Kumar', menteeAvatar: 'AK', menteeEmail: 'arjun@zoho.com',
+    featureName: 'Field History Tracking',
+    description: 'Schema migration blocked — PostgreSQL version mismatch on staging server.',
+    priority: 'high',
+    status: 'resolved',
+    daysBlocked: 4,
+    escalatedBy: 'u5',
+    escalatedTo: 'u4',
+    level: 'manager',
+    mentorComment: 'Escalated after no response for 2 days.',
+  },
+]
