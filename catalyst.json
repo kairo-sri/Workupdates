@@ -1,0 +1,9 @@
+{
+  "functions": {
+    "targets": [
+      "workpulse-api"
+    ],
+    "ignore": [],
+    "source": "functions"
+  }
+}

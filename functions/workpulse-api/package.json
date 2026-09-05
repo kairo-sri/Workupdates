@@ -1,0 +1,13 @@
+{
+  "name": "workpulse-api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "sridhar.ramachandran@zohocorp.com",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.6",
+    "express": "^4.22.2",
+    "jsonwebtoken": "^9.0.3",
+    "zcatalyst-sdk-node": "latest"
+  }
+}
