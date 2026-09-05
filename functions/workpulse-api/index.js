@@ -18,13 +18,26 @@ app.use(cors({ origin: '*' }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// Attach Catalyst SDK instance to every request
-app.use((req, res, next) => {
+// Initialize Catalyst once using runtime admin credentials (CATALYST_CONFIG env var).
+// Browser requests don't carry Catalyst auth headers, so we can't use
+// catalyst.initialize(req) — we need the server-side admin app instead.
+let _catalystApp = null
+function getCatalystApp() {
+  if (_catalystApp) return _catalystApp
   try {
-    req.catalyst = catalyst.initialize(req, { type: 'advancedio' })
+    _catalystApp = catalyst.initializeApp()
   } catch (e) {
-    req.catalyst = null
+    if (!e.message || !e.message.includes('duplicate')) {
+      console.error('Catalyst initializeApp error:', e.message)
+    }
+    // Already initialized — grab the default app from the collection
+    _catalystApp = catalyst.appCollection?.['[DEFAULT]'] || null
   }
+  return _catalystApp
+}
+
+app.use((req, res, next) => {
+  req.catalyst = getCatalystApp()
   next()
 })
 

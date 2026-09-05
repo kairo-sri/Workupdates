@@ -11,11 +11,11 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
 
-    const rows = await query(req.catalyst, `SELECT * FROM Users WHERE email = '${email}' AND is_active = true LIMIT 1`)
+    const rows = await query(req.catalyst, `SELECT * FROM Users WHERE email = '${email}' LIMIT 1`)
     if (!rows || rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' })
 
     const user = rows[0].Users
-    // In production use bcrypt.compare — for now direct match
+    if (user.is_active === false) return res.status(401).json({ error: 'Account deactivated' })
     if (user.password !== password) return res.status(401).json({ error: 'Invalid credentials' })
 
     const token = jwt.sign(
