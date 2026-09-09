@@ -55,7 +55,7 @@ function RoleHome() {
 
 export default function AppRouter() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.VITE_BASENAME || ''}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<RoleHome />} />
@@ -96,6 +96,10 @@ export default function AppRouter() {
           <Route path="features" element={<AdminFeatures />} />
           <Route path="settings" element={<SystemSettings />} />
         </Route>
+
+        {/* Catalyst strips trailing slash → basename path becomes "" → no routes match.
+            This catch-all redirects to "/" so RoleHome handles the rest. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )
